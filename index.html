@@ -17,6 +17,11 @@
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
+        const FPS = 30; // Frames per second
+        const FRAME_INTERVAL = 600 / FPS; // Milliseconds per frame
+        let gameStarted = false;
+        let winTimer = null;
+        let lastFrameTime = 0;
 
         console.log("Script started");
 
@@ -118,11 +123,16 @@
         const grassImage = new Image();
         grassImage.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(grassSVG);
 
+
         const platform = {
             x: 300,
             y: 200,
             width: 200,
-            height: 20
+            height: 20,
+            speed: 1,
+            direction: 1,
+            minY: 150,
+            maxY: 250
         };
 
         const enemy = {
@@ -146,6 +156,19 @@
         const ground = canvas.height - 50;
         let gameOver = false;
         let gameWon = false;
+
+        function drawInstructions() {
+            ctx.fillStyle = 'black';
+            ctx.font = '24px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('Welcome to the 2D Scrolling Game!', canvas.width / 2, 50);
+            ctx.font = '18px Arial';
+            ctx.fillText('Controls:', canvas.width / 2, 100);
+            ctx.fillText('Arrow Left / Right: Move', canvas.width / 2, 130);
+            ctx.fillText('Arrow Up / Space: Jump', canvas.width / 2, 160);
+            ctx.fillText('Moving Left/Right: Shoot', canvas.width / 2, 190);
+            ctx.fillText('Press any key to start', canvas.width / 2, 250);
+        }
 
         function drawPlayer() {
             ctx.save();
@@ -225,6 +248,9 @@
                     player.y = platform.y - player.height;
                     player.yVelocity = 0;
                     player.isJumping = false;
+
+                    // Move player with the platform
+                    player.y += platform.speed * platform.direction;
                 } else if (previousY >= platform.y + platform.height) {
                     player.y = platform.y + platform.height;
                     player.yVelocity = 0;
@@ -329,38 +355,100 @@
             }
         }
 
-        function gameLoop() {
-            console.log("Game loop running");
-            if (gameOver) {
-                ctx.fillStyle = 'black';
-                ctx.font = '48px Arial';
-                ctx.fillText('Game Over', canvas.width / 2 - 100, canvas.height / 2);
-                return;
+        function updatePlatform() {
+            platform.y += platform.speed * platform.direction;
+
+            if (platform.y <= platform.minY || platform.y >= platform.maxY) {
+                platform.direction *= -1;
             }
 
-            if (gameWon) {
-                ctx.fillStyle = 'black';
-                ctx.font = '48px Arial';
-                ctx.fillText('You Win!', canvas.width / 2 - 80, canvas.height / 2);
-                return;
-            }
+            // Update enemy position to stay on the platform
+            enemy.y = platform.y - enemy.height;
+        }
 
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        function resetGame() {
+            gameStarted = false;
+            gameWon = false;
+            gameOver = false;
+            winTimer = null;
 
-            updatePlayer();
-            updateEnemy();
-            updateProjectiles();
+            // Reset player position
+            player.x = 50;
+            player.y = 200;
+            player.yVelocity = 0;
+            player.isJumping = false;
+            player.moveLeft = false;
+            player.moveRight = false;
 
-            drawGround();
-            drawPlatform();
-            drawPlayer();
-            drawEnemy();
-            drawProjectiles();
+            // Reset enemy
+            enemy.x = platform.x + platform.width / 2;
+            enemy.y = platform.y - 30;
+            enemy.health = enemy.maxHealth;
 
+            // Clear projectiles
+            enemyProjectiles.length = 0;
+            playerProjectiles.length = 0;
+
+            // Reset platform position
+            platform.y = 200;
+            platform.direction = 1;
+        }
+
+        function gameLoop(currentTime) {
             requestAnimationFrame(gameLoop);
+
+            if (!gameStarted) {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                drawInstructions();
+                return;
+            }
+
+            const elapsed = currentTime - lastFrameTime;
+
+            if (elapsed > FRAME_INTERVAL) {
+                lastFrameTime = currentTime - (elapsed % FRAME_INTERVAL);
+
+                if (gameOver) {
+                    ctx.fillStyle = 'black';
+                    ctx.font = '48px Arial';
+                    ctx.fillText('Game Over', canvas.width / 2 - 100, canvas.height / 2);
+                    return;
+                }
+
+                if (gameWon) {
+                    ctx.fillStyle = 'black';
+                    ctx.font = '48px Arial';
+                    ctx.fillText('You Win!', canvas.width / 2 - 80, canvas.height / 2);
+                    if (!winTimer) {
+                        winTimer = setTimeout(() => {
+                            resetGame();
+                        }, 3000);
+                    }
+                    return;
+                }
+
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                updatePlayer();
+                updateEnemy();
+                updateProjectiles();
+                updatePlatform();
+
+                drawGround();
+                drawPlatform();
+                drawPlayer();
+                drawEnemy();
+                drawProjectiles();
+            }
         }
 
         document.addEventListener('keydown', (event) => {
+            if (!gameStarted) {
+                resetGame(); // Ensure everything is reset when starting a new game
+                gameStarted = true;
+                return;
+            }
+
             switch (event.key) {
                 case 'ArrowLeft':
                     player.moveLeft = true;
@@ -394,12 +482,18 @@
         let assetsLoaded = 0;
         const totalAssets = 2; // player image and grass image
 
+        function startGame() {
+            console.log("All assets loaded. Starting game loop.");
+            lastFrameTime = performance.now();
+            requestAnimationFrame(gameLoop);
+        }
+
         function assetLoaded() {
             assetsLoaded++;
             console.log(`Asset loaded. ${assetsLoaded}/${totalAssets}`);
             if (assetsLoaded === totalAssets) {
                 console.log("All assets loaded. Starting game loop.");
-                gameLoop();
+                startGame();
             }
         }
 
