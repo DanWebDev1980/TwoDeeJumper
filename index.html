@@ -19,9 +19,10 @@
         const ctx = canvas.getContext('2d');
         const FPS = 30; // Frames per second
         const FRAME_INTERVAL = 600 / FPS; // Milliseconds per frame
+        let lastFrameTime = 0;
         let gameStarted = false;
         let winTimer = null;
-        let lastFrameTime = 0;
+        let gameOverTimer = null;
 
         console.log("Script started");
 
@@ -243,6 +244,7 @@
                 player.isJumping = false;
             }
 
+
             if (checkCollision(player, platform)) {
                 if (previousY + player.height <= platform.y) {
                     player.y = platform.y - player.height;
@@ -267,6 +269,7 @@
 
             if (checkCollision(player, enemy)) {
                 gameOver = true;
+                return; // Stop updating player when game is over
             }
 
             player.shootCooldown--;
@@ -324,7 +327,7 @@
 
                 if (distance < projectile.radius + Math.min(player.width, player.height) / 2) {
                     gameOver = true;
-                    break;
+                    return; // Stop updating projectiles when game is over
                 }
             }
 
@@ -371,6 +374,7 @@
             gameWon = false;
             gameOver = false;
             winTimer = null;
+            gameOverTimer = null;
 
             // Reset player position
             player.x = 50;
@@ -412,6 +416,11 @@
                     ctx.fillStyle = 'black';
                     ctx.font = '48px Arial';
                     ctx.fillText('Game Over', canvas.width / 2 - 100, canvas.height / 2);
+                    if (!gameOverTimer) {
+                        gameOverTimer = setTimeout(() => {
+                            resetGame();
+                        }, 3000);
+                    }
                     return;
                 }
 
